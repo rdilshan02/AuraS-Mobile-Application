@@ -74,6 +74,7 @@ flutter:
     - assets/images/doc1.png
     - assets/images/doc2.png
     - assets/images/doc3.png
+    - assets/images/profile.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
