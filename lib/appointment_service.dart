@@ -76,15 +76,15 @@ class AppointmentService {
         .where('userId', isEqualTo: userId)
         .snapshots()
         .map((snapshot) {
-          var appointments = snapshot.docs
-              .map((doc) => Appointment.fromFirestore(doc))
-              .toList();
-          
-          // Sort in Dart instead of Firestore to avoid index requirement
-          appointments.sort((a, b) => a.date.compareTo(b.date));
-          
-          return appointments;
-        });
+      var appointments = snapshot.docs
+          .map((doc) => Appointment.fromFirestore(doc))
+          .toList();
+
+      // Sort in Dart instead of Firestore to avoid index requirement
+      appointments.sort((a, b) => a.date.compareTo(b.date));
+
+      return appointments;
+    });
   }
 
   // Get appointments for a specific dermatologist - Fixed to avoid potential index issues
@@ -94,39 +94,77 @@ class AppointmentService {
         .where('dermatologistId', isEqualTo: dermatologistId)
         .snapshots()
         .map((snapshot) {
-          var appointments = snapshot.docs
-              .map((doc) => Appointment.fromFirestore(doc))
-              .toList();
-          
-          // Sort in Dart instead of Firestore
-          appointments.sort((a, b) => a.date.compareTo(b.date));
-          
-          return appointments;
-        });
+      var appointments = snapshot.docs
+          .map((doc) => Appointment.fromFirestore(doc))
+          .toList();
+
+      // Sort in Dart instead of Firestore
+      appointments.sort((a, b) => a.date.compareTo(b.date));
+
+      return appointments;
+    });
   }
 
   // Check slot availability
+  // Future<bool> isSlotAvailable(
+  //     String dermatologistId, DateTime date, TimeOfDay time) async {
+  //   try {
+  //     final snapshot = await _firestore
+  //         .collection('appointments')
+  //         .where('dermatologistId', isEqualTo: dermatologistId)
+  //         .where('date', isEqualTo: Timestamp.fromDate(date))
+  //         .where('status', whereNotIn: ['cancelled'])
+  //         .get();
+  //
+  //     final hour = time.hour;
+  //     final minute = time.minute;
+  //
+  //     return !snapshot.docs.any((doc) {
+  //       final data = doc.data();
+  //       return data['time']['hour'] == hour && data['time']['minute'] == minute;
+  //     });
+  //   } catch (e) {
+  //     debugPrint('Error checking slot availability: $e');
+  //     return false;
+  //   }
   Future<bool> isSlotAvailable(
-      String dermatologistId, DateTime date, TimeOfDay time) async {
+      String dermatologistId,
+      DateTime date,
+      TimeOfDay time,
+      ) async {
     try {
-      final snapshot = await _firestore
+      // Normalize date to UTC to avoid timezone issues
+      final utcDate = DateTime.utc(date.year, date.month, date.day);
+      final nextDay = utcDate.add(const Duration(days: 1));
+
+      // Query Firestore for overlapping appointments
+      final QuerySnapshot snapshot = await _firestore
           .collection('appointments')
           .where('dermatologistId', isEqualTo: dermatologistId)
-          .where('date', isEqualTo: Timestamp.fromDate(date))
-          .where('status', whereNotIn: ['cancelled'])
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(utcDate))
+          .where('date', isLessThan: Timestamp.fromDate(nextDay))
+          .where('status', whereIn: ['pending', 'confirmed'])
           .get();
 
-      final hour = time.hour;
-      final minute = time.minute;
+      // Convert time to minutes for easier comparison
+      final selectedMinutes = time.hour * 60 + time.minute;
 
-      return !snapshot.docs.any((doc) {
-        final data = doc.data();
-        return data['time']['hour'] == hour && data['time']['minute'] == minute;
+      // Check if any appointment overlaps with the selected time
+      final isSlotTaken = snapshot.docs.any((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final timeData = data['time'] as Map<String, dynamic>;
+        final appointmentMinutes = timeData['hour'] * 60 + timeData['minute'];
+
+        // Consider appointments within the same time slot
+        return appointmentMinutes == selectedMinutes;
       });
+
+      return !isSlotTaken;
     } catch (e) {
-      debugPrint('Error checking slot availability: $e');
+      debugPrint("Error checking slot availability: $e");
       return false;
     }
+
   }
 
   // Confirm appointment (called via email link)
@@ -224,18 +262,18 @@ class AppointmentService {
         .collection('appointments')
         .where('userId', isEqualTo: userId)
         .where('status', isEqualTo: status)
-        // Removed orderBy to avoid composite index requirement
+    // Removed orderBy to avoid composite index requirement
         .snapshots()
         .map((snapshot) {
-          var appointments = snapshot.docs
-              .map((doc) => Appointment.fromFirestore(doc))
-              .toList();
-          
-          // Sort by date in Dart instead of Firestore
-          appointments.sort((a, b) => a.date.compareTo(b.date));
-          
-          return appointments;
-        });
+      var appointments = snapshot.docs
+          .map((doc) => Appointment.fromFirestore(doc))
+          .toList();
+
+      // Sort by date in Dart instead of Firestore
+      appointments.sort((a, b) => a.date.compareTo(b.date));
+
+      return appointments;
+    });
   }
 
   // Alternative method if you want to optimize further by querying all user appointments
@@ -246,16 +284,16 @@ class AppointmentService {
         .where('userId', isEqualTo: userId)
         .snapshots()
         .map((snapshot) {
-          var appointments = snapshot.docs
-              .map((doc) => Appointment.fromFirestore(doc))
-              .where((appointment) => appointment.status.toLowerCase() == status.toLowerCase())
-              .toList();
-          
-          // Sort by date
-          appointments.sort((a, b) => a.date.compareTo(b.date));
-          
-          return appointments;
-        });
+      var appointments = snapshot.docs
+          .map((doc) => Appointment.fromFirestore(doc))
+          .where((appointment) => appointment.status.toLowerCase() == status.toLowerCase())
+          .toList();
+
+      // Sort by date
+      appointments.sort((a, b) => a.date.compareTo(b.date));
+
+      return appointments;
+    });
   }
 
   // Get all appointments for a user (useful for dashboard/overview)
@@ -265,42 +303,42 @@ class AppointmentService {
         .where('userId', isEqualTo: userId)
         .snapshots()
         .map((snapshot) {
-          var appointments = snapshot.docs
-              .map((doc) => Appointment.fromFirestore(doc))
-              .toList();
-          
-          // Sort by date (newest first for overview)
-          appointments.sort((a, b) => b.date.compareTo(a.date));
-          
-          return appointments;
-        });
+      var appointments = snapshot.docs
+          .map((doc) => Appointment.fromFirestore(doc))
+          .toList();
+
+      // Sort by date (newest first for overview)
+      appointments.sort((a, b) => b.date.compareTo(a.date));
+
+      return appointments;
+    });
   }
 
   // Get recent appointments (last 30 days)
   Stream<List<Appointment>> getRecentAppointments(String userId) {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-    
+
     return _firestore
         .collection('appointments')
         .where('userId', isEqualTo: userId)
         .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(thirtyDaysAgo))
         .snapshots()
         .map((snapshot) {
-          var appointments = snapshot.docs
-              .map((doc) => Appointment.fromFirestore(doc))
-              .toList();
-          
-          appointments.sort((a, b) => b.date.compareTo(a.date));
-          
-          return appointments;
-        });
+      var appointments = snapshot.docs
+          .map((doc) => Appointment.fromFirestore(doc))
+          .toList();
+
+      appointments.sort((a, b) => b.date.compareTo(a.date));
+
+      return appointments;
+    });
   }
 
   // Get upcoming appointments
   Stream<List<Appointment>> getUpcomingAppointments(String userId) {
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
-    
+
     return _firestore
         .collection('appointments')
         .where('userId', isEqualTo: userId)
@@ -308,13 +346,13 @@ class AppointmentService {
         .where('status', whereIn: ['pending', 'confirmed'])
         .snapshots()
         .map((snapshot) {
-          var appointments = snapshot.docs
-              .map((doc) => Appointment.fromFirestore(doc))
-              .toList();
-          
-          appointments.sort((a, b) => a.date.compareTo(b.date));
-          
-          return appointments;
-        });
+      var appointments = snapshot.docs
+          .map((doc) => Appointment.fromFirestore(doc))
+          .toList();
+
+      appointments.sort((a, b) => a.date.compareTo(b.date));
+
+      return appointments;
+    });
   }
 }
