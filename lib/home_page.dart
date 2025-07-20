@@ -52,7 +52,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => AppointmentsScreen(userId: '',),
+                builder: (context) => MyAppointmentsScreen(),
               ),
             );
           },

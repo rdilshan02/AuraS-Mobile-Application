@@ -52,7 +52,7 @@ class _CustomHeaderState extends State<CustomHeader> {
       case 'My Appointments':
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const AppointmentsScreen(userId: '1',)),
+          MaterialPageRoute(builder: (_) => MyAppointmentsScreen()),
         );
         break;
       case 'FAQ':

@@ -2343,50 +2343,72 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
       }
       return;
     }
-    if (_selectedDate == null || _selectedTime == null) return;
+    // if (_selectedDate == null || _selectedTime == null) return;
 
     setState(() => _isBooking = true);
 
     try {
-
-      // First check if slot is available
-      final isAvailable = await _appointmentService.isSlotAvailable(
-        widget.dermatologist.id,
-        _selectedDate!,
-        _selectedTime!,
+      final utcDate = DateTime.utc(
+        _selectedDate!.year,
+        _selectedDate!.month,
+        _selectedDate!.day,
       );
 
-      if (!isAvailable) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('This time slot is already booked'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        return;
-      }
+      // First check if slot is available
+      // final isAvailable = await _appointmentService.isSlotAvailable(
+      //   widget.dermatologist.id,
+      //   _selectedDate!,
+      //   _selectedTime!,
+      // );
+      //
+      // if (!isAvailable) {
+      //   if (mounted) {
+      //     ScaffoldMessenger.of(context).showSnackBar(
+      //       const SnackBar(
+      //         content: Text('This time slot is already booked'),
+      //         backgroundColor: Colors.orange,
+      //       ),
+      //     );
+      //   }
+      //   return;
+      // }
 
       final appointment = Appointment(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        // userId: widget.userId,
-        userId: '', // Will be populated by service
+        userId: widget.userId,
+        // userId: '', // Will be populated by service
         dermatologistId: widget.dermatologist.id,
         dermatologistEmail: widget.dermatologist.email,
         date: DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day),
         time: _selectedTime!,
         status: 'pending',
-        // userName: widget.userName,
-        // userEmail: widget.userEmail,
-        // userPhone: widget.userPhone,
-        userName: '', // Will be filled by service
-        userEmail: '', // Will be filled by service
-        userPhone: '', // Will be filled by service
+        userName: widget.userName,
+        userEmail: widget.userEmail,
+        userPhone: widget.userPhone,
+        // userName: '', // Will be filled by service
+        // userEmail: '', // Will be filled by service
+        // userPhone: '', // Will be filled by service
         dermatologistName: widget.dermatologist.name,
-        createdAt: DateTime.now(),
+        createdAt: DateTime.now().toUtc(),
         consultationFee: widget.dermatologist.consultationFee,
       );
+
+      // Check availability using UTC date
+      final isAvailable = await _appointmentService.isSlotAvailable(
+        widget.dermatologist.id,
+        utcDate,
+        _selectedTime!,
+      );
+
+      if (!isAvailable) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This time slot is no longer available'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
 
       // Store in Firestore
       await _appointmentService.bookAppointment(appointment);
